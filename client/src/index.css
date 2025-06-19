@@ -1,0 +1,296 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(240, 10%, 3.9%);
+  --foreground: hsl(0, 0%, 98%);
+  --muted: hsl(240, 3.7%, 15.9%);
+  --muted-foreground: hsl(240, 5%, 64.9%);
+  --popover: hsl(240, 10%, 3.9%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --card: hsl(240, 10%, 3.9%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --border: hsl(240, 3.7%, 15.9%);
+  --input: hsl(240, 3.7%, 15.9%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(240, 3.7%, 15.9%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --accent: hsl(240, 3.7%, 15.9%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(240, 4.9%, 83.9%);
+  --radius: 0.5rem;
+  
+  /* Educational platform colors */
+  --coral: hsl(358, 100%, 69%);
+  --teal: hsl(174, 60%, 63%);
+  --sky: hsl(198, 60%, 63%);
+  --mint: hsl(142, 37%, 67%);
+  --purple: hsl(271, 91%, 65%);
+  --orange: hsl(28, 100%, 63%);
+  --yellow: hsl(48, 100%, 67%);
+  
+  /* Neon glows */
+  --neon-coral: hsl(358, 100%, 69%);
+  --neon-teal: hsl(174, 100%, 50%);
+  --neon-purple: hsl(271, 100%, 70%);
+  --neon-blue: hsl(207, 100%, 60%);
+}
+
+.light {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(20, 14.3%, 4.1%);
+  --muted: hsl(60, 4.8%, 95.9%);
+  --muted-foreground: hsl(25, 5.3%, 44.7%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(20, 14.3%, 4.1%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(20, 14.3%, 4.1%);
+  --border: hsl(20, 5.9%, 90%);
+  --input: hsl(20, 5.9%, 90%);
+  --primary: hsl(207, 90%, 54%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(60, 4.8%, 95.9%);
+  --secondary-foreground: hsl(24, 9.8%, 10%);
+  --accent: hsl(60, 4.8%, 95.9%);
+  --accent-foreground: hsl(24, 9.8%, 10%);
+  --destructive: hsl(0, 84.2%, 60.2%);
+  --destructive-foreground: hsl(60, 9.1%, 97.8%);
+  --ring: hsl(20, 14.3%, 4.1%);
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer utilities {
+  .text-coral {
+    color: var(--coral);
+  }
+  
+  .text-teal {
+    color: var(--teal);
+  }
+  
+  .text-sky {
+    color: var(--sky);
+  }
+  
+  .text-mint {
+    color: var(--mint);
+  }
+  
+  .text-purple {
+    color: var(--purple);
+  }
+  
+  .text-orange {
+    color: var(--orange);
+  }
+  
+  .text-yellow {
+    color: var(--yellow);
+  }
+  
+  .bg-coral {
+    background-color: var(--coral);
+  }
+  
+  .bg-teal {
+    background-color: var(--teal);
+  }
+  
+  .bg-sky {
+    background-color: var(--sky);
+  }
+  
+  .bg-mint {
+    background-color: var(--mint);
+  }
+  
+  .bg-purple {
+    background-color: var(--purple);
+  }
+  
+  .bg-orange {
+    background-color: var(--orange);
+  }
+  
+  .bg-yellow {
+    background-color: var(--yellow);
+  }
+  
+  .border-coral {
+    border-color: var(--coral);
+  }
+  
+  .border-teal {
+    border-color: var(--teal);
+  }
+  
+  .border-sky {
+    border-color: var(--sky);
+  }
+  
+  .border-mint {
+    border-color: var(--mint);
+  }
+  
+  .border-purple {
+    border-color: var(--purple);
+  }
+  
+  .hover\:bg-coral:hover {
+    background-color: var(--coral);
+  }
+  
+  .hover\:bg-teal:hover {
+    background-color: var(--teal);
+  }
+  
+  .hover\:text-coral:hover {
+    color: var(--coral);
+  }
+  
+  .hover\:text-teal:hover {
+    color: var(--teal);
+  }
+  
+  .hover\:border-coral:hover {
+    border-color: var(--coral);
+  }
+  
+  .neon-glow {
+    box-shadow: 0 0 20px currentColor;
+  }
+  
+  .neon-glow-coral {
+    box-shadow: 0 0 20px var(--neon-coral);
+  }
+  
+  .neon-glow-teal {
+    box-shadow: 0 0 20px var(--neon-teal);
+  }
+  
+  .neon-glow-purple {
+    box-shadow: 0 0 20px var(--neon-purple);
+  }
+  
+  .neon-glow-blue {
+    box-shadow: 0 0 20px var(--neon-blue);
+  }
+  
+  .gradient-coral {
+    background: linear-gradient(135deg, var(--coral), hsl(358, 100%, 80%));
+  }
+  
+  .gradient-teal {
+    background: linear-gradient(135deg, var(--teal), hsl(174, 60%, 75%));
+  }
+  
+  .gradient-purple {
+    background: linear-gradient(135deg, var(--purple), hsl(271, 91%, 80%));
+  }
+  
+  .gradient-blue {
+    background: linear-gradient(135deg, var(--primary), hsl(207, 90%, 65%));
+  }
+  
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-20px);
+    }
+  }
+  
+  .chart-coral {
+    --color: var(--coral);
+  }
+  
+  .chart-teal {
+    --color: var(--teal);
+  }
+  
+  .chart-sky {
+    --color: var(--sky);
+  }
+  
+  .chart-mint {
+    --color: var(--mint);
+  }
+  
+  .chart-purple {
+    --color: var(--purple);
+  }
+  
+  .chart-orange {
+    --color: var(--orange);
+  }
+  
+  .chart-yellow {
+    --color: var(--yellow);
+  }
+}
+
+/* Scrollbar styling for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(240, 3.7%, 15.9%);
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(240, 5%, 64.9%);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* Loading animations */
+@keyframes shimmer {
+  0% {
+    background-position: -468px 0;
+  }
+  100% {
+    background-position: 468px 0;
+  }
+}
+
+.shimmer {
+  animation: shimmer 1.5s ease-in-out infinite;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 468px 100%;
+}
