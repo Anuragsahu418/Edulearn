@@ -8,12 +8,14 @@ import { ProtectedRoute } from "./lib/protected-route";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import AdminDashboard from "@/pages/admin-dashboard";
+import StudentDashboard from "@/pages/student-dashboard";
 
 function Router() {
   return (
     <Switch>
       <ProtectedRoute path="/" component={AdminDashboard} />
       <Route path="/auth" component={AuthPage} />
+      <Route path="/student" component={StudentDashboard} />
       <Route component={NotFound} />
     </Switch>
   );

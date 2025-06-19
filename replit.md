@@ -127,6 +127,9 @@ The application uses four main entities:
 ```
 Changelog:
 - June 19, 2025. Initial setup
+- June 19, 2025. Simplified to admin-only grid interface for student data management
+- June 19, 2025. Fixed neon glow effect and removed rectangular edges from styling
+- June 19, 2025. Added student portal back with secret key authentication (current key: PRAYAS2025)
 ```
 
 ## User Preferences
