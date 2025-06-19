@@ -1,310 +1,378 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { BookOpen, Upload, Users, TrendingUp, FileText, Plus, BarChart3 } from "lucide-react";
-import { Navbar } from "@/components/navbar";
-import { UploadForm } from "@/components/upload-form";
-import { ScoreForm } from "@/components/score-form";
-import { MaterialsGrid } from "@/components/materials-grid";
-import { PerformanceCharts } from "@/components/performance-charts";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Material, Student, Score } from "@shared/schema";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Plus, Save, Trash2, Calendar, User, FileText, Target } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
+import { Score, Student } from "@shared/schema";
+
+interface ScoreEntry {
+  id?: number;
+  date: string;
+  studentName: string;
+  testName: string;
+  marks: string;
+  isNew?: boolean;
+}
 
 export default function AdminDashboard() {
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [scoreDialogOpen, setScoreDialogOpen] = useState(false);
+  const [entries, setEntries] = useState<ScoreEntry[]>([]);
+  const [secretKey, setSecretKey] = useState("");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { user, logoutMutation } = useAuth();
 
-  const { data: materials = [] } = useQuery<Material[]>({
-    queryKey: ["/api/materials"],
+  const { data: scores = [] } = useQuery<(Score & { studentName: string })[]>({
+    queryKey: ["/api/scores"],
   });
 
   const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["/api/students"],
   });
 
-  const { data: scores = [] } = useQuery<(Score & { studentName: string })[]>({
-    queryKey: ["/api/scores"],
+  // Convert existing scores to entries format
+  useEffect(() => {
+    const scoreEntries: ScoreEntry[] = scores.map(score => ({
+      id: score.id,
+      date: new Date(score.testDate).toISOString().split('T')[0],
+      studentName: score.studentName,
+      testName: score.subject,
+      marks: `${score.marks}/${score.maxMarks}`,
+    }));
+    setEntries(scoreEntries);
+  }, [scores]);
+
+  const saveEntryMutation = useMutation({
+    mutationFn: async (entry: ScoreEntry) => {
+      // Create student if doesn't exist
+      let student = students.find(s => s.name === entry.studentName);
+      if (!student) {
+        const studentRes = await apiRequest("POST", "/api/students", { 
+          name: entry.studentName 
+        });
+        student = await studentRes.json();
+      }
+
+      if (!student) {
+        throw new Error("Failed to create or find student");
+      }
+
+      // Parse marks
+      const marksParts = entry.marks.includes('/') ? entry.marks.split('/') : [entry.marks, "100"];
+      const marks = parseFloat(marksParts[0].trim());
+      const maxMarks = parseFloat(marksParts[1]?.trim() || "100");
+      
+      if (isNaN(marks) || isNaN(maxMarks)) {
+        throw new Error("Invalid marks format. Use numbers like '85' or '85/100'");
+      }
+      
+      const scoreData = {
+        studentId: student.id,
+        subject: entry.testName,
+        marks: marks.toString(),
+        maxMarks: maxMarks.toString(),
+        testDate: new Date(entry.date).toISOString(),
+      };
+
+      const res = await apiRequest("POST", "/api/scores", scoreData);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Score saved successfully!",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/scores"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/students"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
-  const recentMaterials = materials.slice(0, 5);
-  const recentScores = scores.slice(0, 5);
+  const updateSecretKeyMutation = useMutation({
+    mutationFn: async (key: string) => {
+      const res = await apiRequest("PUT", "/api/settings/student_secret_key", { value: key });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Secret key updated successfully!",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
-  const totalSubjects = new Set(materials.map(m => m.subject)).size;
-  const avgScore = scores.length > 0 
-    ? scores.reduce((acc, score) => acc + (parseFloat(score.marks) / parseFloat(score.maxMarks)) * 100, 0) / scores.length
-    : 0;
+  const addNewRow = () => {
+    const newEntry: ScoreEntry = {
+      date: new Date().toISOString().split('T')[0],
+      studentName: "",
+      testName: "",
+      marks: "",
+      isNew: true,
+    };
+    setEntries([...entries, newEntry]);
+  };
+
+  const updateEntry = (index: number, field: keyof ScoreEntry, value: string) => {
+    const updated = [...entries];
+    updated[index] = { ...updated[index], [field]: value };
+    setEntries(updated);
+  };
+
+  const saveEntry = (index: number) => {
+    const entry = entries[index];
+    if (!entry.studentName || !entry.testName || !entry.marks) {
+      toast({
+        title: "Error",
+        description: "Please fill all fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    saveEntryMutation.mutate(entry);
+  };
+
+  const removeEntry = (index: number) => {
+    const updated = entries.filter((_, i) => i !== index);
+    setEntries(updated);
+  };
+
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
+
+  const updateSecretKey = () => {
+    if (!secretKey.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a secret key",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateSecretKeyMutation.mutate(secretKey);
+  };
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
-      
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            Admin <span className="text-coral neon-glow">Dashboard</span>
-          </h1>
-          <p className="text-muted-foreground">
-            Manage your educational platform with ease
-          </p>
+      {/* Simple Header */}
+      <div className="bg-card border-b border-border">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold text-foreground">
+              <span className="text-coral neon-glow">EduLearn</span> Admin Panel
+            </h1>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-muted-foreground">Welcome, {user?.username}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              >
+                Logout
+              </Button>
+            </div>
+          </div>
         </div>
+      </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="border-border bg-card hover:bg-card/80 transition-colors">
+      <div className="container mx-auto px-4 py-8">
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <Card className="border-border bg-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-card-foreground">
-                Total Materials
+                Total Entries
               </CardTitle>
               <FileText className="h-4 w-4 text-coral" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-foreground">{materials.length}</div>
-              <p className="text-xs text-muted-foreground">
-                Across {totalSubjects} subjects
-              </p>
+              <div className="text-2xl font-bold text-foreground">{entries.length}</div>
             </CardContent>
           </Card>
 
-          <Card className="border-border bg-card hover:bg-card/80 transition-colors">
+          <Card className="border-border bg-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-card-foreground">
-                Total Students
+                Students
               </CardTitle>
-              <Users className="h-4 w-4 text-teal" />
+              <User className="h-4 w-4 text-teal" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">{students.length}</div>
-              <p className="text-xs text-muted-foreground">
-                Active learners
-              </p>
             </CardContent>
           </Card>
 
-          <Card className="border-border bg-card hover:bg-card/80 transition-colors">
+          <Card className="border-border bg-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-card-foreground">
-                Total Scores
+                Tests
               </CardTitle>
-              <BarChart3 className="h-4 w-4 text-purple" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{scores.length}</div>
-              <p className="text-xs text-muted-foreground">
-                Assessment records
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-card hover:bg-card/80 transition-colors">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-card-foreground">
-                Average Score
-              </CardTitle>
-              <TrendingUp className="h-4 w-4 text-sky" />
+              <Target className="h-4 w-4 text-purple" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">
-                {avgScore.toFixed(1)}%
+                {new Set(entries.map(e => e.testName)).size}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Class performance
-              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border bg-card">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-card-foreground">
+                Latest Entry
+              </CardTitle>
+              <Calendar className="h-4 w-4 text-sky" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm font-bold text-foreground">
+                {entries.length > 0 ? new Date(Math.max(...entries.map(e => new Date(e.date).getTime()))).toLocaleDateString() : "No entries"}
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Quick Actions */}
-        <div className="flex flex-wrap gap-4 mb-8">
-          <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gradient-coral text-white hover:opacity-90">
-                <Upload className="w-4 h-4 mr-2" />
-                Upload Material
+        {/* Secret Key Management */}
+        <Card className="border-border bg-card mb-8">
+          <CardHeader>
+            <CardTitle className="text-card-foreground">Student Portal Secret Key</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4 items-end">
+              <div className="flex-1">
+                <Input
+                  placeholder="Enter new secret key for students"
+                  value={secretKey}
+                  onChange={(e) => setSecretKey(e.target.value)}
+                  className="bg-input border-border"
+                />
+              </div>
+              <Button
+                onClick={updateSecretKey}
+                className="gradient-teal text-white hover:opacity-90"
+                disabled={updateSecretKeyMutation.isPending}
+              >
+                Update Key
               </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Upload Study Material</DialogTitle>
-              </DialogHeader>
-              <UploadForm onSuccess={() => setUploadDialogOpen(false)} />
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={scoreDialogOpen} onOpenChange={setScoreDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gradient-teal text-white hover:opacity-90">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Score
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Add Student Score</DialogTitle>
-              </DialogHeader>
-              <ScoreForm onSuccess={() => setScoreDialogOpen(false)} />
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        {/* Main Content Tabs */}
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-1/2">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="materials">Materials</TabsTrigger>
-            <TabsTrigger value="scores">Scores</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Recent Materials */}
-              <Card className="border-border bg-card">
-                <CardHeader>
-                  <CardTitle className="text-card-foreground flex items-center">
-                    <BookOpen className="w-5 h-5 mr-2 text-coral" />
-                    Recent Materials
-                  </CardTitle>
-                  <CardDescription>
-                    Latest uploaded study materials
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {recentMaterials.length > 0 ? (
-                      recentMaterials.map((material) => (
-                        <div
-                          key={material.id}
-                          className="flex items-center justify-between p-3 bg-muted rounded-lg"
-                        >
-                          <div className="flex-1">
-                            <h4 className="font-medium text-foreground">{material.title}</h4>
-                            <p className="text-sm text-muted-foreground">{material.subject}</p>
-                          </div>
-                          <Badge variant="outline" className="border-coral text-coral">
-                            PDF
-                          </Badge>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-muted-foreground text-center py-4">
-                        No materials uploaded yet
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Recent Scores */}
-              <Card className="border-border bg-card">
-                <CardHeader>
-                  <CardTitle className="text-card-foreground flex items-center">
-                    <TrendingUp className="w-5 h-5 mr-2 text-teal" />
-                    Recent Scores
-                  </CardTitle>
-                  <CardDescription>
-                    Latest student performance records
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {recentScores.length > 0 ? (
-                      recentScores.map((score) => (
-                        <div
-                          key={score.id}
-                          className="flex items-center justify-between p-3 bg-muted rounded-lg"
-                        >
-                          <div className="flex-1">
-                            <h4 className="font-medium text-foreground">{score.studentName}</h4>
-                            <p className="text-sm text-muted-foreground">{score.subject}</p>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-medium text-foreground">
-                              {score.marks}/{score.maxMarks}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {((parseFloat(score.marks) / parseFloat(score.maxMarks)) * 100).toFixed(1)}%
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-muted-foreground text-center py-4">
-                        No scores recorded yet
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
             </div>
-          </TabsContent>
+          </CardContent>
+        </Card>
 
-          <TabsContent value="materials">
-            <MaterialsGrid />
-          </TabsContent>
-
-          <TabsContent value="scores">
-            <Card className="border-border bg-card">
-              <CardHeader>
-                <CardTitle className="text-card-foreground">All Scores</CardTitle>
-                <CardDescription>
-                  Complete list of student performance records
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {scores.length > 0 ? (
-                    scores.map((score) => (
-                      <div
-                        key={score.id}
-                        className="flex items-center justify-between p-4 bg-muted rounded-lg"
-                      >
-                        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2">
-                          <div>
-                            <h4 className="font-medium text-foreground">{score.studentName}</h4>
-                            <p className="text-sm text-muted-foreground">{score.subject}</p>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-medium text-foreground">
-                              {score.marks}/{score.maxMarks}
-                            </div>
-                            <Badge
-                              variant="outline"
-                              className={
-                                (parseFloat(score.marks) / parseFloat(score.maxMarks)) * 100 >= 80
-                                  ? "border-mint text-mint"
-                                  : (parseFloat(score.marks) / parseFloat(score.maxMarks)) * 100 >= 60
-                                  ? "border-yellow text-yellow"
-                                  : "border-coral text-coral"
-                              }
-                            >
-                              {((parseFloat(score.marks) / parseFloat(score.maxMarks)) * 100).toFixed(1)}%
-                            </Badge>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm text-muted-foreground">
-                              {new Date(score.testDate).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))
+        {/* Data Grid */}
+        <Card className="border-border bg-card">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-card-foreground">Student Scores Management</CardTitle>
+              <Button
+                onClick={addNewRow}
+                className="gradient-coral text-white hover:opacity-90"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Entry
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-lg border border-border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="text-foreground font-semibold">Date</TableHead>
+                    <TableHead className="text-foreground font-semibold">Student Name</TableHead>
+                    <TableHead className="text-foreground font-semibold">Test Name</TableHead>
+                    <TableHead className="text-foreground font-semibold">Marks</TableHead>
+                    <TableHead className="text-foreground font-semibold">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {entries.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        No entries yet. Click "Add Entry" to get started.
+                      </TableCell>
+                    </TableRow>
                   ) : (
-                    <p className="text-muted-foreground text-center py-8">
-                      No scores recorded yet. Add student scores to see them here.
-                    </p>
+                    entries.map((entry, index) => (
+                      <TableRow key={index} className="hover:bg-muted/30">
+                        <TableCell>
+                          <Input
+                            type="date"
+                            value={entry.date}
+                            onChange={(e) => updateEntry(index, 'date', e.target.value)}
+                            className="bg-background border-border"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            placeholder="Student name"
+                            value={entry.studentName}
+                            onChange={(e) => updateEntry(index, 'studentName', e.target.value)}
+                            className="bg-background border-border"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            placeholder="Test/Subject name"
+                            value={entry.testName}
+                            onChange={(e) => updateEntry(index, 'testName', e.target.value)}
+                            className="bg-background border-border"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            placeholder="20/25 or 85"
+                            value={entry.marks}
+                            onChange={(e) => updateEntry(index, 'marks', e.target.value)}
+                            className="bg-background border-border"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            {entry.isNew && (
+                              <Button
+                                size="sm"
+                                onClick={() => saveEntry(index)}
+                                className="gradient-mint text-white hover:opacity-90"
+                                disabled={saveEntryMutation.isPending}
+                              >
+                                <Save className="w-4 h-4" />
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => removeEntry(index)}
+                              className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
                   )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="analytics">
-            <PerformanceCharts />
-          </TabsContent>
-        </Tabs>
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

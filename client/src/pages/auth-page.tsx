@@ -41,8 +41,9 @@ export default function AuthPage() {
     },
   });
 
+  // Redirect after hooks are called
   if (user) {
-    navigate("/");
+    setTimeout(() => navigate("/"), 0);
     return null;
   }
 
